@@ -1,14 +1,14 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Slider } from "@/components/ui/slider"
 import { compareModels } from "@/lib/api"
-import { ArrowLeftRight, Loader2, Save, Zap, Check, Code, FileText, ImageIcon } from "lucide-react"
+import { ArrowLeftRight, Loader2, Save, Zap, Check, Code, FileText, ImageIcon, Lock, Unlock } from 'lucide-react'
 import type { ModelResponse } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
@@ -100,21 +100,35 @@ const PROMPT_EXAMPLES = [
   "Escreva um poema sobre inteligência artificial no estilo de Carlos Drummond de Andrade.",
 ]
 
+// Tipo para os modelos
+interface ModelConfig {
+  provider: string
+  modelId: string
+}
+
 export default function LLMComparisonForm() {
-  const [prompt, setPrompt] = useState("")
-  const [leftModel, setLeftModel] = useState<{ provider: string; modelId: string }>({
+  // Usar useRef para evitar atualizações indesejadas
+  const leftModelRef = useRef<ModelConfig>({
     provider: "openai",
     modelId: "gpt-4.1-2025-04-14",
   })
-  const [rightModel, setRightModel] = useState<{ provider: string; modelId: string }>({
+  
+  const rightModelRef = useRef<ModelConfig>({
     provider: "anthropic",
     modelId: "claude-3-7-sonnet-latest",
   })
+  
+  // Estado para forçar re-renderização
+  const [, forceUpdate] = useState({})
+  
+  // Estados para controle da UI
+  const [prompt, setPrompt] = useState("")
   const [temperature, setTemperature] = useState(0.7)
   const [isLoading, setIsLoading] = useState(false)
   const [results, setResults] = useState<ModelResponse[]>([])
   const [isSaved, setIsSaved] = useState(false)
   const [outputMode, setOutputMode] = useState<"text" | "code" | "image">("text")
+  const [pinnedModels, setPinnedModels] = useState<{ left: boolean; right: boolean }>({ left: false, right: false })
   const { toast } = useToast()
 
   // Resetar o estado de "salvo" quando uma nova comparação é feita
@@ -124,15 +138,78 @@ export default function LLMComparisonForm() {
     }
   }, [results])
 
+  // Funções para atualizar os modelos de forma segura
+  const updateLeftModel = (update: Partial<ModelConfig>) => {
+    if (pinnedModels.left) return // Não atualizar se estiver travado
+    
+    const newModel = { ...leftModelRef.current, ...update }
+    leftModelRef.current = newModel
+    
+    // Forçar re-renderização
+    forceUpdate({})
+    
+    console.log("Modelo esquerdo atualizado:", leftModelRef.current)
+  }
+  
+  const updateRightModel = (update: Partial<ModelConfig>) => {
+    if (pinnedModels.right) return // Não atualizar se estiver travado
+    
+    const newModel = { ...rightModelRef.current, ...update }
+    rightModelRef.current = newModel
+    
+    // Forçar re-renderização
+    forceUpdate({})
+    
+    console.log("Modelo direito atualizado:", rightModelRef.current)
+  }
+  
+  // Função para atualizar o provedor e selecionar o primeiro modelo
+  const updateProvider = (side: "left" | "right", provider: string) => {
+    const providerKey = provider as keyof typeof MODEL_PROVIDERS
+    const firstModel = MODEL_PROVIDERS[providerKey].models[0]
+    
+    if (side === "left") {
+      updateLeftModel({ 
+        provider, 
+        modelId: firstModel.id 
+      })
+    } else {
+      updateRightModel({ 
+        provider, 
+        modelId: firstModel.id 
+      })
+    }
+  }
+
+  // Modificar a função handleSubmit para enviar requisição apenas para modelos não travados
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!prompt.trim()) return
 
     setIsLoading(true)
     try {
-      // Formatar os IDs dos modelos para incluir o provedor
-      const modelIds = [`${leftModel.provider}/${leftModel.modelId}`, `${rightModel.provider}/${rightModel.modelId}`]
+      // Formatar os IDs dos modelos para incluir o provedor, apenas para modelos não travados
+      const modelIds: string[] = []
 
+      // Adicionar modelo da esquerda se não estiver travado
+      if (!pinnedModels.left) {
+        const leftModel = leftModelRef.current
+        modelIds.push(`${leftModel.provider}/${leftModel.modelId}`)
+      }
+
+      // Adicionar modelo da direita se não estiver travado
+      if (!pinnedModels.right) {
+        const rightModel = rightModelRef.current
+        modelIds.push(`${rightModel.provider}/${rightModel.modelId}`)
+      }
+
+      // Se nenhum modelo estiver selecionado, usar o modelo da esquerda por padrão
+      if (modelIds.length === 0) {
+        const leftModel = leftModelRef.current
+        modelIds.push(`${leftModel.provider}/${leftModel.modelId}`)
+      }
+
+      console.log("Enviando requisição para modelos:", modelIds)
       const responses = await compareModels(prompt, modelIds, outputMode, { temperature })
 
       setResults(responses)
@@ -170,8 +247,20 @@ export default function LLMComparisonForm() {
   }
 
   const handleSwapModels = () => {
-    setLeftModel(rightModel)
-    setRightModel(leftModel)
+    if (pinnedModels.left && pinnedModels.right) return
+    
+    // Trocar os modelos
+    const tempModel = { ...leftModelRef.current }
+    leftModelRef.current = { ...rightModelRef.current }
+    rightModelRef.current = tempModel
+    
+    // Forçar re-renderização
+    forceUpdate({})
+    
+    console.log("Modelos trocados:", { 
+      left: leftModelRef.current, 
+      right: rightModelRef.current 
+    })
   }
 
   const handleUseExample = () => {
@@ -179,15 +268,16 @@ export default function LLMComparisonForm() {
     setPrompt(randomExample)
   }
 
-  // Adicionar estado para controlar quais modelos estão travados
-  const [pinnedModels, setPinnedModels] = useState<{ left: boolean; right: boolean }>({ left: false, right: false })
-
   const togglePinModel = (side: "left" | "right") => {
     setPinnedModels((prev) => ({
       ...prev,
       [side]: !prev[side],
     }))
   }
+
+  // Obter os modelos atuais para renderização
+  const leftModel = leftModelRef.current
+  const rightModel = rightModelRef.current
 
   return (
     <div className="space-y-10">
@@ -286,51 +376,33 @@ export default function LLMComparisonForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Modelo 1 */}
-            <Card className={`model-card border-2 ${pinnedModels.left ? "border-primary" : ""}`}>
+            <Card className={`model-card border-2 ${pinnedModels.left ? "border-primary bg-primary/5" : ""}`}>
               <CardHeader className="pb-2 pt-4 px-4">
                 <div className="flex justify-between items-center">
                   <h4 className="text-sm font-medium text-muted-foreground">Modelo 1</h4>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => togglePinModel("left")}>
+                        <Button
+                          variant={pinnedModels.left ? "secondary" : "ghost"}
+                          size="icon"
+                          className={`h-8 w-8 ${pinnedModels.left ? "bg-primary/20 hover:bg-primary/30" : ""}`}
+                          onClick={() => togglePinModel("left")}
+                        >
                           {pinnedModels.left ? (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-primary"
-                            >
-                              <line x1="12" x2="12" y1="17" y2="22" />
-                              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0-4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-                            </svg>
+                            <Lock className="h-4 w-4 text-primary" />
                           ) : (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <line x1="12" x2="12" y1="17" y2="22" />
-                              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0-4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-                            </svg>
+                            <Unlock className="h-4 w-4" />
                           )}
                           <span className="sr-only">{pinnedModels.left ? "Destravar modelo" : "Travar modelo"}</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{pinnedModels.left ? "Destravar modelo" : "Travar modelo"}</p>
+                        <p>
+                          {pinnedModels.left
+                            ? "Modelo travado (não será usado na comparação)"
+                            : "Travar modelo (não será usado na comparação)"}
+                        </p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -343,17 +415,16 @@ export default function LLMComparisonForm() {
                   </Label>
                   <Select
                     value={leftModel.provider}
-                    onValueChange={(value) => {
-                      if (!pinnedModels.left) {
-                        const provider = value as keyof typeof MODEL_PROVIDERS
-                        const firstModelId = MODEL_PROVIDERS[provider].models[0].id
-                        setLeftModel({ provider, modelId: firstModelId })
-                      }
-                    }}
+                    onValueChange={(provider) => updateProvider("left", provider)}
                     disabled={pinnedModels.left}
                   >
                     <SelectTrigger id="left-provider" className="model-selector">
-                      <SelectValue placeholder="Selecione um provedor" />
+                      <SelectValue placeholder="Selecione um provedor">
+                        <span className="flex items-center">
+                          <span className="mr-2">{MODEL_PROVIDERS[leftModel.provider as keyof typeof MODEL_PROVIDERS]?.icon}</span>
+                          <span>{MODEL_PROVIDERS[leftModel.provider as keyof typeof MODEL_PROVIDERS]?.name}</span>
+                        </span>
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {Object.entries(MODEL_PROVIDERS).map(([providerId, provider]) => (
@@ -374,15 +445,15 @@ export default function LLMComparisonForm() {
                   </Label>
                   <Select
                     value={leftModel.modelId}
-                    onValueChange={(value) => {
-                      if (!pinnedModels.left) {
-                        setLeftModel({ ...leftModel, modelId: value })
-                      }
-                    }}
+                    onValueChange={(modelId) => updateLeftModel({ modelId })}
                     disabled={pinnedModels.left}
                   >
                     <SelectTrigger id="left-model" className="model-selector">
-                      <SelectValue placeholder="Selecione um modelo" />
+                      <SelectValue placeholder="Selecione um modelo">
+                        {MODEL_PROVIDERS[leftModel.provider as keyof typeof MODEL_PROVIDERS]?.models.find(
+                          (m) => m.id === leftModel.modelId
+                        )?.name || "Selecione um modelo"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -402,51 +473,33 @@ export default function LLMComparisonForm() {
             </Card>
 
             {/* Modelo 2 */}
-            <Card className={`model-card border-2 ${pinnedModels.right ? "border-primary" : ""}`}>
+            <Card className={`model-card border-2 ${pinnedModels.right ? "border-primary bg-primary/5" : ""}`}>
               <CardHeader className="pb-2 pt-4 px-4">
                 <div className="flex justify-between items-center">
                   <h4 className="text-sm font-medium text-muted-foreground">Modelo 2</h4>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => togglePinModel("right")}>
+                        <Button
+                          variant={pinnedModels.right ? "secondary" : "ghost"}
+                          size="icon"
+                          className={`h-8 w-8 ${pinnedModels.right ? "bg-primary/20 hover:bg-primary/30" : ""}`}
+                          onClick={() => togglePinModel("right")}
+                        >
                           {pinnedModels.right ? (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="text-primary"
-                            >
-                              <line x1="12" x2="12" y1="17" y2="22" />
-                              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0-4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-                            </svg>
+                            <Lock className="h-4 w-4 text-primary" />
                           ) : (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="16"
-                              height="16"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <line x1="12" x2="12" y1="17" y2="22" />
-                              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0-4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
-                            </svg>
+                            <Unlock className="h-4 w-4" />
                           )}
                           <span className="sr-only">{pinnedModels.right ? "Destravar modelo" : "Travar modelo"}</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>{pinnedModels.right ? "Destravar modelo" : "Travar modelo"}</p>
+                        <p>
+                          {pinnedModels.right
+                            ? "Modelo travado (não será usado na comparação)"
+                            : "Travar modelo (não será usado na comparação)"}
+                        </p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -459,17 +512,16 @@ export default function LLMComparisonForm() {
                   </Label>
                   <Select
                     value={rightModel.provider}
-                    onValueChange={(value) => {
-                      if (!pinnedModels.right) {
-                        const provider = value as keyof typeof MODEL_PROVIDERS
-                        const firstModelId = MODEL_PROVIDERS[provider].models[0].id
-                        setRightModel({ provider, modelId: firstModelId })
-                      }
-                    }}
+                    onValueChange={(provider) => updateProvider("right", provider)}
                     disabled={pinnedModels.right}
                   >
                     <SelectTrigger id="right-provider" className="model-selector">
-                      <SelectValue placeholder="Selecione um provedor" />
+                      <SelectValue placeholder="Selecione um provedor">
+                        <span className="flex items-center">
+                          <span className="mr-2">{MODEL_PROVIDERS[rightModel.provider as keyof typeof MODEL_PROVIDERS]?.icon}</span>
+                          <span>{MODEL_PROVIDERS[rightModel.provider as keyof typeof MODEL_PROVIDERS]?.name}</span>
+                        </span>
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       {Object.entries(MODEL_PROVIDERS).map(([providerId, provider]) => (
@@ -490,15 +542,15 @@ export default function LLMComparisonForm() {
                   </Label>
                   <Select
                     value={rightModel.modelId}
-                    onValueChange={(value) => {
-                      if (!pinnedModels.right) {
-                        setRightModel({ ...rightModel, modelId: value })
-                      }
-                    }}
+                    onValueChange={(modelId) => updateRightModel({ modelId })}
                     disabled={pinnedModels.right}
                   >
                     <SelectTrigger id="right-model" className="model-selector">
-                      <SelectValue placeholder="Selecione um modelo" />
+                      <SelectValue placeholder="Selecione um modelo">
+                        {MODEL_PROVIDERS[rightModel.provider as keyof typeof MODEL_PROVIDERS]?.models.find(
+                          (m) => m.id === rightModel.modelId
+                        )?.name || "Selecione um modelo"}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -618,3 +670,15 @@ export default function LLMComparisonForm() {
     </div>
   )
 }
+
+interface Action {
+  name: string;
+  description: string;
+}
+
+const Actions: Action[] = [
+  { name: "Adicionar indicador de modelos ativos", description: "Mostrar claramente quantos e quais modelos serão consultados antes de enviar" },
+  { name: "Implementar persistência de seleção", description: "Salvar os últimos provedores e modelos selecionados no localStorage" },
+  { name: "Adicionar modo de comparação em lote", description: "Permitir comparar vários prompts de uma vez" },
+  { name: "Implementar comparação de mais de dois modelos", description: "Adicionar suporte para comparar três ou mais modelos simultaneamente" },
+];
