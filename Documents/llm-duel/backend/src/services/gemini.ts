@@ -5,11 +5,6 @@ import { containsCode, containsImages } from "../utils/responseParser"
 
 export class GeminiService {
   private genAI: GoogleGenerativeAI
-  private modelMap: Record<string, string> = {
-    text: "gemini-2.5-pro",
-    code: "gemini-2.5-pro",
-    image: "gemini-2.5-pro", // Gemini pode interpretar imagens, mas não gerá-las diretamente
-  }
 
   constructor() {
     const apiKey = process.env.GOOGLE_API_KEY
@@ -25,7 +20,13 @@ export class GeminiService {
     options?: Record<string, any>,
   ): Promise<LLMResponse> {
     try {
-      const modelId = options?.model || this.modelMap[mode]
+      // Sempre usar o modelo fornecido pelo usuário
+      const modelId = options?.model
+
+      if (!modelId) {
+        throw ApiError.badRequest("Modelo não especificado")
+      }
+
       const model = this.genAI.getGenerativeModel({ model: modelId })
 
       // Ajustar o prompt para código se necessário

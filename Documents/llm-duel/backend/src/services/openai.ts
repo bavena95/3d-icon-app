@@ -5,11 +5,6 @@ import { containsCode, containsImages } from "../utils/responseParser"
 
 export class OpenAIService {
   private openai: OpenAI
-  private modelMap: Record<string, string> = {
-    text: "gpt-4.1-2025-04-14",
-    code: "gpt-4.1-2025-04-14",
-    image: "gpt-image-1",
-  }
 
   constructor() {
     const apiKey = process.env.OPENAI_API_KEY
@@ -25,9 +20,14 @@ export class OpenAIService {
     options?: Record<string, any>,
   ): Promise<LLMResponse> {
     try {
-      const modelId = options?.model || this.modelMap[mode]
+      // Sempre usar o modelo fornecido pelo usuário
+      const modelId = options?.model
 
-      if (mode === "image") {
+      if (!modelId) {
+        throw ApiError.badRequest("Modelo não especificado")
+      }
+
+      if (modelId === "gpt-image-1" || mode === "image") {
         const response = await this.openai.images.generate({
           model: "dall-e-3",
           prompt,
@@ -36,10 +36,6 @@ export class OpenAIService {
           ...options,
         })
 
-        // Modificar o trecho que está causando o erro (linha 39)
-        // De:
-        // const imageUrl = response.data[0]?.url
-        // Para:
         const imageUrl = response.data?.[0]?.url
         if (!imageUrl) {
           throw ApiError.internal("Falha ao gerar imagem")

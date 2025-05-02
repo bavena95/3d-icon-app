@@ -6,11 +6,6 @@ import { containsCode, containsImages } from "../utils/responseParser"
 export class DeepseekService {
   private apiKey: string
   private baseUrl = "https://api.deepseek.com/v1"
-  private modelMap: Record<string, string> = {
-    text: "deepseek-chat",
-    code: "deepseek-reasoner",
-    image: "deepseek-chat", // DeepSeek não gera imagens
-  }
 
   constructor() {
     const apiKey = process.env.DEEPSEEK_API_KEY
@@ -26,7 +21,12 @@ export class DeepseekService {
     options?: Record<string, any>,
   ): Promise<LLMResponse> {
     try {
-      const modelId = options?.model || this.modelMap[mode]
+      // Sempre usar o modelo fornecido pelo usuário
+      const modelId = options?.model
+
+      if (!modelId) {
+        throw ApiError.badRequest("Modelo não especificado")
+      }
 
       const response = await axios.post(
         `${this.baseUrl}/chat/completions`,

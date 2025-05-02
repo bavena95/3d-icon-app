@@ -2,8 +2,9 @@ import { Suspense } from "react"
 import LLMComparisonForm from "@/components/llm-comparison-form"
 import ModelConfigDialog from "@/components/model-config-dialog"
 import { ModeToggle } from "@/components/mode-toggle"
-import { Github } from "lucide-react"
+import { Github, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
 
 export default function Home() {
@@ -12,14 +13,14 @@ export default function Home() {
       <header className="border-b">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl font-medium tracking-tight">LLM Studio</span>
+            <span className="text-xl font-medium tracking-tight">LLM Duel</span>
           </div>
           <div className="flex items-center gap-4">
             <Button variant="outline" size="sm" asChild>
               <Link href="/history">Histórico</Link>
             </Button>
             <Button variant="outline" size="icon" asChild>
-              <a href="https://github.com/username/llm-studio" target="_blank" rel="noopener noreferrer">
+              <a href="https://github.com/bavena95/llm-duel" target="_blank" rel="noopener noreferrer">
                 <Github className="h-4 w-4" />
                 <span className="sr-only">GitHub</span>
               </a>
@@ -35,6 +36,14 @@ export default function Home() {
           <p className="text-muted-foreground text-lg mb-6">
             Compare diferentes modelos de linguagem lado a lado para encontrar o melhor para seu caso de uso.
           </p>
+
+          <Alert className="mb-6 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-600 dark:text-amber-400">
+              Importante: Configure suas chaves de API abaixo. As chaves serão salvas de forma segura no servidor.
+            </AlertDescription>
+          </Alert>
+
           <div className="flex">
             <ModelConfigDialog />
           </div>
@@ -49,7 +58,7 @@ export default function Home() {
 
       <footer className="border-t py-6">
         <div className="container flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p>© {new Date().getFullYear()} LLM Studio. Todos os direitos reservados.</p>
+          <p>© {new Date().getFullYear()} LLM Duel. Todos os direitos reservados.</p>
           <div className="flex gap-6">
             <a href="#" className="hover:text-foreground transition-colors">
               Termos

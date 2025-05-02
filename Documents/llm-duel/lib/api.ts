@@ -15,6 +15,8 @@ export async function callLLMApi(
   const startTime = Date.now()
 
   try {
+    console.log(`Chamando API para ${provider}/${modelId}`)
+
     const response = await fetch(`${API_BASE_URL}/${provider}`, {
       method: "POST",
       headers: {
@@ -65,6 +67,8 @@ export async function compareModels(
   mode: "text" | "code" | "image" = "text",
   options?: Record<string, any>,
 ): Promise<ModelResponse[]> {
+  console.log(`Comparando modelos: ${modelIds.join(", ")} com modo: ${mode}`)
+
   // Processamento paralelo das chamadas de API
   const promises = modelIds.map(async (fullModelId) => {
     const [provider, modelId] = fullModelId.split("/")

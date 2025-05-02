@@ -9,7 +9,7 @@ import { MarkdownRenderer } from "./markdown-renderer"
 import { parseResponse } from "@/lib/response-parser"
 import type { ResponseBlock, ModelResponse } from "@/lib/types"
 import { Button } from "@/components/ui/button"
-import { Copy, Check, Code, ImageIcon, FileText } from 'lucide-react'
+import { Copy, Check, Code, ImageIcon, FileText } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ResponseViewerProps {
@@ -71,38 +71,38 @@ export function ResponseViewer({ response, className }: ResponseViewerProps) {
               </TabsTrigger>
             )}
           </TabsList>
+
+          <div className="overflow-y-auto max-h-[500px] custom-scrollbar mt-4">
+            <TabsContent value="all" className="mt-0 space-y-4">
+              {blocks.map((block, index) => (
+                <RenderBlock key={index} block={block} />
+              ))}
+            </TabsContent>
+
+            <TabsContent value="text" className="mt-0 space-y-4">
+              {textBlocks.map((block, index) => (
+                <RenderBlock key={index} block={block} />
+              ))}
+            </TabsContent>
+
+            <TabsContent value="code" className="mt-0 space-y-4">
+              {codeBlocks.map((block, index) => (
+                <RenderBlock key={index} block={block} />
+              ))}
+            </TabsContent>
+
+            <TabsContent value="image" className="mt-0 space-y-4">
+              {imageBlocks.map((block, index) => (
+                <RenderBlock key={index} block={block} />
+              ))}
+            </TabsContent>
+          </div>
         </Tabs>
 
-        <Button variant="ghost" size="sm" onClick={copyToClipboard} className="h-8 px-2">
+        <Button variant="ghost" size="sm" onClick={copyToClipboard} className="h-8 px-2 ml-2">
           {copied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
           <span className="sr-only">Copy to clipboard</span>
         </Button>
-      </div>
-
-      <div className="overflow-y-auto max-h-[500px] custom-scrollbar">
-        <TabsContent value="all" className="mt-0 space-y-4">
-          {blocks.map((block, index) => (
-            <RenderBlock key={index} block={block} />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="text" className="mt-0 space-y-4">
-          {textBlocks.map((block, index) => (
-            <RenderBlock key={index} block={block} />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="code" className="mt-0 space-y-4">
-          {codeBlocks.map((block, index) => (
-            <RenderBlock key={index} block={block} />
-          ))}
-        </TabsContent>
-
-        <TabsContent value="image" className="mt-0 space-y-4">
-          {imageBlocks.map((block, index) => (
-            <RenderBlock key={index} block={block} />
-          ))}
-        </TabsContent>
       </div>
     </div>
   )

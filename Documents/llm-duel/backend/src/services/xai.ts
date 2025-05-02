@@ -6,11 +6,6 @@ import { containsCode, containsImages } from "../utils/responseParser"
 export class XAIService {
   private apiKey: string
   private baseUrl = "https://api.xai.com/v1"
-  private modelMap: Record<string, string> = {
-    text: "grok-3",
-    code: "grok-3",
-    image: "grok-3", // Grok não gera imagens
-  }
 
   constructor() {
     const apiKey = process.env.XAI_API_KEY
@@ -26,7 +21,12 @@ export class XAIService {
     options?: Record<string, any>,
   ): Promise<LLMResponse> {
     try {
-      const modelId = options?.model || this.modelMap[mode]
+      // Sempre usar o modelo fornecido pelo usuário
+      const modelId = options?.model
+
+      if (!modelId) {
+        throw ApiError.badRequest("Modelo não especificado")
+      }
 
       // Ajustar o prompt para código se necessário
       const finalPrompt =

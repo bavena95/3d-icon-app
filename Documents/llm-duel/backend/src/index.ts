@@ -41,7 +41,7 @@ app.use(limiter) // Rate limiting
 // Rotas
 app.use("/api/openai", openaiRouter)
 app.use("/api/anthropic", claudeRouter)
-app.use("/api/gemini", geminiRouter)
+app.use("/api/google", geminiRouter)
 app.use("/api/xai", xaiRouter)
 app.use("/api/deepseek", deepseekRouter)
 app.use("/api/mistral", mistralRouter)
