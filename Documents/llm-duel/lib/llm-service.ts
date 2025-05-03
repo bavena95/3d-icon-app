@@ -1,7 +1,7 @@
 import type { ModelResponse } from "./types"
 import { containsCode, containsImages } from "./response-parser"
 
-// Função para comparar modelos usando o backend como intermediário
+// Função para comparar modelos usando as API Routes do Next.js
 export async function compareModels(
   prompt: string,
   modelIds: string[],
@@ -16,7 +16,7 @@ export async function compareModels(
     const [provider, modelId] = fullModelId.split("/")
 
     try {
-      // Fazer a chamada para o backend em vez de usar o AI SDK diretamente
+      // Fazer a chamada para a API Route
       const response = await fetch("/api/llm/generate", {
         method: "POST",
         headers: {
@@ -41,17 +41,13 @@ export async function compareModels(
 
       const data = await response.json()
 
-      // Detectar se a resposta contém código ou imagens
-      const hasCode = containsCode(data.response)
-      const hasImages = containsImages(data.response)
-
       return {
         modelId: fullModelId,
         response: data.response,
         timeTaken: Date.now() - startTime,
         tokensUsed: data.tokensUsed,
-        containsCode: hasCode,
-        containsImages: hasImages,
+        containsCode: data.containsCode || containsCode(data.response),
+        containsImages: data.containsImages || containsImages(data.response),
       }
     } catch (error) {
       console.error(`Erro ao chamar o modelo ${fullModelId}:`, error)

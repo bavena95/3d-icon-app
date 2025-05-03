@@ -18,7 +18,12 @@ const nextConfig = {
     unoptimized: true,
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
+  },
+  // Configuração correta para permitir módulos do Node.js nas API Routes
+  serverExternalPackages: ['fs', 'path', 'dotenv'],
+  experimental: {
+    // Removido serverComponentsExternalPackages daqui
   },
 };
 

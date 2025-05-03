@@ -21,3 +21,15 @@ export interface ResponseBlock {
   language?: string
   alt?: string
 }
+
+export interface APIResponse {
+  text: string
+  tokensUsed?: number
+  containsCode?: boolean
+  containsImages?: boolean
+}
+
+export interface APIErrorResponse {
+  error: string
+  details?: any
+}

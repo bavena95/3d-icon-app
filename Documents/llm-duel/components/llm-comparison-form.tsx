@@ -253,70 +253,6 @@ export default function LLMComparisonForm() {
     }))
   }
 
-  // Função para atualizar o provedor e selecionar o primeiro modelo
-  // const updateProvider = (side: "left" | "right", provider: string) => {
-  //   const providerKey = provider as keyof typeof MODEL_PROVIDERS
-  //   const firstModel = MODEL_PROVIDERS[providerKey].models[0]
-
-  //   if (side === "left") {
-  //     console.log(`Alterando provedor esquerdo para: ${provider}, modelo: ${firstModel.id}`)
-  //     setLeftModel({
-  //       provider,
-  //       modelId: firstModel.id,
-  //     })
-  //   } else {
-  //     console.log(`Alterando provedor direito para: ${provider}, modelo: ${firstModel.id}`)
-  //     setRightModel({
-  //       provider,
-  //       modelId: firstModel.id,
-  //     })
-  //   }
-  // }
-
-  // Verificar se os modelos selecionados são válidos
-  // Remover este useEffect
-  // useEffect(() => {
-  //   // Verificar modelo esquerdo
-  //   const leftProviderExists = MODEL_PROVIDERS[leftModel.provider as keyof typeof MODEL_PROVIDERS]
-  //   if (!leftProviderExists) {
-  //     console.error(`Provedor esquerdo ${leftModel.provider} não encontrado`)
-  //     // Definir para o primeiro provedor disponível
-  //     const firstProvider = Object.keys(MODEL_PROVIDERS)[0]
-  //     updateProvider("left", firstProvider)
-  //     return
-  //   }
-
-  //   const leftModelExists = leftProviderExists.models.some((m) => m.id === leftModel.modelId)
-  //   if (!leftModelExists) {
-  //     console.error(`Modelo esquerdo ${leftModel.modelId} não encontrado no provedor ${leftModel.provider}`)
-  //     // Definir para o primeiro modelo do provedor
-  //     setLeftModel({
-  //       ...leftModel,
-  //       modelId: leftProviderExists.models[0].id,
-  //     })
-  //   }
-
-  //   // Verificar modelo direito
-  //   const rightProviderExists = MODEL_PROVIDERS[rightModel.provider as keyof typeof MODEL_PROVIDERS]
-  //   if (!rightProviderExists) {
-  //     console.error(`Provedor direito ${rightModel.provider} não encontrado`)
-  //     // Definir para o primeiro provedor disponível
-  //     const firstProvider = Object.keys(MODEL_PROVIDERS)[0]
-  //     updateProvider("right", firstProvider)
-  //     return
-  //   }
-
-  //   const rightModelExists = rightProviderExists.models.some((m) => m.id === rightModel.modelId)
-  //   if (!rightModelExists) {
-  //     console.error(`Modelo direito ${rightModel.modelId} não encontrado no provedor ${rightModel.provider}`)
-  //     // Definir para o primeiro modelo do provedor
-  //     setRightModel({
-  //       ...rightModel,
-  //       modelId: rightProviderExists.models[0].id,
-  //     })
-  //   }
-  // }, [leftModel, rightModel, updateProvider, setLeftModel])
-
   return (
     <div className="space-y-10">
       <form onSubmit={handleSubmit} className="space-y-8">
@@ -390,7 +326,7 @@ export default function LLMComparisonForm() {
 
             <Button
               type="submit"
-              className="w-full h-12 compare-button font-medium text-base mt-auto"
+              className="w-full h-12 come-button font-medium text-base mt-auto"
               disabled={isLoading || !prompt.trim()}
             >
               {isLoading ? (
