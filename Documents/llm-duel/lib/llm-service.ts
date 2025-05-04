@@ -16,6 +16,19 @@ export async function compareModels(
     const [provider, modelId] = fullModelId.split("/")
 
     try {
+      // Verificar se é um modelo de imagem
+      const isImageModel = modelId === "gpt-image-1" || mode === "image"
+
+      // Preparar opções, removendo temperatura para modelos de imagem
+      const apiOptions = {
+        ...options,
+      }
+
+      // Remover temperatura para modelos de imagem
+      if (isImageModel && provider === "openai") {
+        delete apiOptions.temperature
+      }
+
       // Fazer a chamada para a API Route
       const response = await fetch("/api/llm/generate", {
         method: "POST",
@@ -27,10 +40,7 @@ export async function compareModels(
           modelId,
           prompt,
           mode,
-          options: {
-            temperature: options?.temperature || 0.7,
-            ...options,
-          },
+          options: apiOptions,
         }),
       })
 

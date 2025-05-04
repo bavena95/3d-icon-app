@@ -20,10 +20,12 @@ const nextConfig = {
   env: {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
   },
-  // Configuração correta para permitir módulos do Node.js nas API Routes
-  serverExternalPackages: ['fs', 'path', 'dotenv'],
+  // Configuração experimental para permitir módulos externos
   experimental: {
-    // Removido serverComponentsExternalPackages daqui
+    // Permitir importações dinâmicas em tempo de execução
+    serverComponentsExternalPackages: ['@google/genai', 'fs', 'path', 'dotenv'],
+    // Desativar verificações de dependências para evitar erros de compilação
+    externalDir: true,
   },
 };
 

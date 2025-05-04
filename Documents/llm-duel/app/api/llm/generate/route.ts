@@ -48,12 +48,18 @@ export async function POST(request: NextRequest) {
               apiKey: process.env.OPENAI_API_KEY,
             })
 
+            // Remover temperatura das opções apenas para o modelo gpt-image-1
+            const imageOptions = { ...options }
+            if (modelId === "gpt-image-1") {
+              delete imageOptions.temperature
+            }
+
             const imageResponse = await openaiClient.images.generate({
-              model: "dall-e-3",
+              model: "gpt-image-1",
               prompt: finalPrompt,
               n: 1,
               size: "1024x1024",
-              ...options,
+              ...imageOptions,
             })
 
             const imageUrl = imageResponse.data?.[0]?.url
@@ -107,35 +113,53 @@ export async function POST(request: NextRequest) {
 
       case "google":
         try {
-          console.log(`Chamando Google modelo ${modelId}`)
+          console.log(`Chamando Google modelo ${modelId} via API REST`)
 
+          // Usar diretamente a API REST do Google Gemini
+          const apiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models"
+          const apiKey = process.env.GOOGLE_API_KEY
+
+          // Configurar as opções de geração
+          const generationConfig = {
+            temperature: options?.temperature || 0.7,
+            maxOutputTokens: options?.max_tokens || 8192,
+            ...options,
+          }
+
+          // Fazer a requisição para a API REST
           const googleResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent`,
+            `${apiEndpoint}/${modelId}:generateContent?key=${apiKey}`,
             {
-              contents: [{ role: "user", parts: [{ text: finalPrompt }] }],
-              generationConfig: {
-                temperature: options?.temperature || 0.7,
-                maxOutputTokens: options?.max_tokens || 8192,
-              },
+              contents: [{ parts: [{ text: finalPrompt }] }],
+              generationConfig,
             },
             {
               headers: {
                 "Content-Type": "application/json",
               },
-              params: {
-                key: process.env.GOOGLE_API_KEY,
-              },
             },
           )
 
-          response = googleResponse.data.candidates[0]?.content?.parts[0]?.text || ""
-          tokensUsed = 0 // Google não fornece contagem de tokens na API
+          // Extrair a resposta do formato da API REST
+          response = googleResponse.data.candidates?.[0]?.content?.parts?.[0]?.text || ""
+          tokensUsed = 0 // Google não fornece contagem de tokens na API REST
         } catch (error) {
           console.error(`Erro ao chamar Google (${modelId}):`, error)
-          return NextResponse.json(
-            { error: `Erro ao chamar Google: ${error instanceof Error ? error.message : String(error)}` },
-            { status: 500 },
-          )
+
+          // Extrair mensagem de erro mais detalhada da resposta da API, se disponível
+          let errorMessage = error instanceof Error ? error.message : String(error)
+
+          if (axios.isAxiosError(error) && error.response?.data?.error) {
+            const apiError = error.response.data.error
+            errorMessage = `${apiError.message || apiError.status || "Erro desconhecido"}`
+
+            // Adicionar detalhes adicionais se disponíveis
+            if (apiError.details) {
+              errorMessage += `: ${JSON.stringify(apiError.details)}`
+            }
+          }
+
+          return NextResponse.json({ error: `Erro ao chamar Google: ${errorMessage}` }, { status: 500 })
         }
         break
 

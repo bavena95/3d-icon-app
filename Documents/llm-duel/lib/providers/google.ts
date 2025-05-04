@@ -1,4 +1,3 @@
-import axios from "axios"
 import type { APIResponse } from "../types"
 
 export async function callGoogleAPI(
@@ -7,32 +6,34 @@ export async function callGoogleAPI(
   options?: Record<string, any>,
 ): Promise<APIResponse> {
   try {
-    const response = await axios.post(
-      `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent`,
-      {
-        contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: options?.temperature || 0.7,
-          maxOutputTokens: options?.max_tokens || 8192,
-          ...options,
-        },
+    // Não podemos inicializar o cliente aqui no frontend
+    // Vamos apenas fazer uma chamada para a API Route
+    const response = await fetch("/api/llm/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
       },
-      {
-        headers: {
-          "Content-Type": "application/json",
-        },
-        params: {
-          key: process.env.GOOGLE_API_KEY,
-        },
-      },
-    )
+      body: JSON.stringify({
+        provider: "google",
+        modelId,
+        prompt,
+        options,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || `Erro na chamada da API: ${response.status}`)
+    }
+
+    const data = await response.json()
 
     return {
-      text: response.data.candidates[0]?.content?.parts[0]?.text || "",
-      tokensUsed: 0, // Google não fornece contagem de tokens na API
+      text: data.response || "",
+      tokensUsed: data.tokensUsed || 0,
     }
   } catch (error: any) {
     console.error(`Erro ao chamar Google (${modelId}):`, error)
-    throw new Error(`Erro ao chamar Google: ${error.response?.data?.error?.message || error.message}`)
+    throw new Error(`Erro ao chamar Google: ${error.message}`)
   }
 }
