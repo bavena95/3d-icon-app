@@ -1,14 +1,21 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { createRouteHandlerClient } from "@/lib/supabase"
 import { cleanupCache, getCacheStats } from "@/lib/cache"
 
 export async function GET(req: NextRequest) {
   try {
-    const { userId } = auth()
+    const supabase = createRouteHandlerClient()
 
-    if (!userId) {
+    // Verificar autenticação
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     // Obter estatísticas do cache
     const stats = await getCacheStats()
@@ -25,11 +32,18 @@ export async function GET(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { userId } = auth()
+    const supabase = createRouteHandlerClient()
 
-    if (!userId) {
+    // Verificar autenticação
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     // Obter o número de dias do query string
     const url = new URL(req.url)

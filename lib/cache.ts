@@ -1,5 +1,6 @@
 import crypto from "crypto"
-import sql from "./db"
+import { createRouteHandlerClient } from "./supabase"
+import { v4 as uuidv4 } from "uuid"
 
 // Interface para os itens do cache
 export interface CacheItem {
@@ -8,8 +9,8 @@ export interface CacheItem {
   prompt: string
   staticUrl: string
   animatedUrl: string | null
-  createdAt: Date
-  lastAccessedAt: Date
+  createdAt: string
+  lastAccessedAt: string
   accessCount: number
 }
 
@@ -34,37 +35,35 @@ export function hashPrompt(prompt: string): string {
  */
 export async function checkCache(prompt: string): Promise<CacheItem | null> {
   const hash = hashPrompt(prompt)
+  const supabase = createRouteHandlerClient()
 
   try {
-    const results = await sql<CacheItem[]>`
-      SELECT 
-        id, 
-        prompt_hash as "promptHash", 
-        prompt, 
-        static_url as "staticUrl", 
-        animated_url as "animatedUrl", 
-        created_at as "createdAt", 
-        last_accessed_at as "lastAccessedAt",
-        access_count as "accessCount"
-      FROM icon_cache 
-      WHERE prompt_hash = ${hash}
-      LIMIT 1
-    `
+    // Buscar o item no cache
+    const { data, error } = await supabase.from("icon_cache").select("*").eq("prompt_hash", hash).single()
 
-    if (results.length > 0) {
-      // Atualizar o contador de acessos e o timestamp de último acesso
-      await sql`
-        UPDATE icon_cache 
-        SET 
-          access_count = access_count + 1,
-          last_accessed_at = NOW()
-        WHERE id = ${results[0].id}
-      `
-
-      return results[0]
+    if (error || !data) {
+      return null
     }
 
-    return null
+    // Atualizar o contador de acessos e o timestamp de último acesso
+    await supabase
+      .from("icon_cache")
+      .update({
+        access_count: data.access_count + 1,
+        last_accessed_at: new Date().toISOString(),
+      })
+      .eq("id", data.id)
+
+    return {
+      id: data.id,
+      promptHash: data.prompt_hash,
+      prompt: data.prompt,
+      staticUrl: data.static_url,
+      animatedUrl: data.animated_url,
+      createdAt: data.created_at,
+      lastAccessedAt: data.last_accessed_at,
+      accessCount: data.access_count,
+    }
   } catch (error) {
     console.error("Erro ao verificar cache:", error)
     return null
@@ -76,46 +75,71 @@ export async function checkCache(prompt: string): Promise<CacheItem | null> {
  */
 export async function addToCache(prompt: string, staticUrl: string, animatedUrl: string | null): Promise<CacheItem> {
   const hash = hashPrompt(prompt)
-  const id = crypto.randomUUID()
+  const id = uuidv4()
+  const supabase = createRouteHandlerClient()
 
   try {
-    const results = await sql<CacheItem[]>`
-      INSERT INTO icon_cache (
-        id, 
-        prompt_hash, 
-        prompt, 
-        static_url, 
-        animated_url, 
-        created_at, 
-        last_accessed_at, 
-        access_count
-      )
-      VALUES (
-        ${id}, 
-        ${hash}, 
-        ${prompt}, 
-        ${staticUrl}, 
-        ${animatedUrl}, 
-        NOW(), 
-        NOW(), 
-        1
-      )
-      ON CONFLICT (prompt_hash) 
-      DO UPDATE SET 
-        access_count = icon_cache.access_count + 1,
-        last_accessed_at = NOW()
-      RETURNING 
-        id, 
-        prompt_hash as "promptHash", 
-        prompt, 
-        static_url as "staticUrl", 
-        animated_url as "animatedUrl", 
-        created_at as "createdAt", 
-        last_accessed_at as "lastAccessedAt",
-        access_count as "accessCount"
-    `
+    // Verificar se o item já existe no cache
+    const { data: existingData } = await supabase.from("icon_cache").select("id").eq("prompt_hash", hash).single()
 
-    return results[0]
+    if (existingData) {
+      // Se o item já existe, atualizar o contador de acessos e o timestamp
+      const { data, error } = await supabase
+        .from("icon_cache")
+        .update({
+          access_count: existingData.access_count + 1,
+          last_accessed_at: new Date().toISOString(),
+        })
+        .eq("id", existingData.id)
+        .select()
+        .single()
+
+      if (error) {
+        throw error
+      }
+
+      return {
+        id: data.id,
+        promptHash: data.prompt_hash,
+        prompt: data.prompt,
+        staticUrl: data.static_url,
+        animatedUrl: data.animated_url,
+        createdAt: data.created_at,
+        lastAccessedAt: data.last_accessed_at,
+        accessCount: data.access_count,
+      }
+    }
+
+    // Se o item não existe, inserir um novo
+    const { data, error } = await supabase
+      .from("icon_cache")
+      .insert({
+        id,
+        prompt_hash: hash,
+        prompt,
+        static_url: staticUrl,
+        animated_url: animatedUrl,
+        created_at: new Date().toISOString(),
+        last_accessed_at: new Date().toISOString(),
+        access_count: 1,
+      })
+      .select()
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return {
+      id: data.id,
+      promptHash: data.prompt_hash,
+      prompt: data.prompt,
+      staticUrl: data.static_url,
+      animatedUrl: data.animated_url,
+      createdAt: data.created_at,
+      lastAccessedAt: data.last_accessed_at,
+      accessCount: data.access_count,
+    }
   } catch (error) {
     console.error("Erro ao adicionar ao cache:", error)
     throw error
@@ -127,14 +151,22 @@ export async function addToCache(prompt: string, staticUrl: string, animatedUrl:
  * @param days Número de dias para manter itens no cache
  */
 export async function cleanupCache(days = 30): Promise<number> {
-  try {
-    const result = await sql`
-      DELETE FROM icon_cache
-      WHERE last_accessed_at < NOW() - INTERVAL '${days} days'
-      RETURNING id
-    `
+  const supabase = createRouteHandlerClient()
+  const cutoffDate = new Date()
+  cutoffDate.setDate(cutoffDate.getDate() - days)
 
-    return result.length
+  try {
+    const { data, error } = await supabase
+      .from("icon_cache")
+      .delete()
+      .lt("last_accessed_at", cutoffDate.toISOString())
+      .select("id")
+
+    if (error) {
+      throw error
+    }
+
+    return data?.length || 0
   } catch (error) {
     console.error("Erro ao limpar cache:", error)
     return 0
@@ -147,31 +179,59 @@ export async function cleanupCache(days = 30): Promise<number> {
 export async function getCacheStats(): Promise<{
   totalItems: number
   totalHits: number
-  oldestItem: Date | null
-  newestItem: Date | null
+  oldestItem: string | null
+  newestItem: string | null
 }> {
+  const supabase = createRouteHandlerClient()
+
   try {
-    const countResult = await sql<[{ count: number }]>`
-      SELECT COUNT(*) as count FROM icon_cache
-    `
+    // Obter contagem total de itens
+    const { count: totalItems, error: countError } = await supabase
+      .from("icon_cache")
+      .select("*", { count: "exact", head: true })
 
-    const hitsResult = await sql<[{ sum: number }]>`
-      SELECT SUM(access_count) as sum FROM icon_cache
-    `
+    if (countError) {
+      throw countError
+    }
 
-    const oldestResult = await sql<[{ oldest: Date }]>`
-      SELECT MIN(created_at) as oldest FROM icon_cache
-    `
+    // Obter soma total de acessos
+    const { data: hitsData, error: hitsError } = await supabase.rpc("sum_access_count")
 
-    const newestResult = await sql<[{ newest: Date }]>`
-      SELECT MAX(created_at) as newest FROM icon_cache
-    `
+    if (hitsError) {
+      console.error("Erro ao obter soma de acessos:", hitsError)
+    }
+
+    const totalHits = hitsData || 0
+
+    // Obter item mais antigo
+    const { data: oldestData, error: oldestError } = await supabase
+      .from("icon_cache")
+      .select("created_at")
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .single()
+
+    if (oldestError && oldestError.code !== "PGRST116") {
+      console.error("Erro ao obter item mais antigo:", oldestError)
+    }
+
+    // Obter item mais recente
+    const { data: newestData, error: newestError } = await supabase
+      .from("icon_cache")
+      .select("created_at")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single()
+
+    if (newestError && newestError.code !== "PGRST116") {
+      console.error("Erro ao obter item mais recente:", newestError)
+    }
 
     return {
-      totalItems: countResult[0]?.count || 0,
-      totalHits: hitsResult[0]?.sum || 0,
-      oldestItem: oldestResult[0]?.oldest || null,
-      newestItem: newestResult[0]?.newest || null,
+      totalItems: totalItems || 0,
+      totalHits,
+      oldestItem: oldestData?.created_at || null,
+      newestItem: newestData?.created_at || null,
     }
   } catch (error) {
     console.error("Erro ao obter estatísticas do cache:", error)

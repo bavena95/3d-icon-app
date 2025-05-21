@@ -1,7 +1,8 @@
 "use client"
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/contexts/auth-context"
+import { createClientComponentClient } from "@/lib/supabase"
 
 interface CreditsContextType {
   credits: number
@@ -14,13 +15,14 @@ interface CreditsContextType {
 const CreditsContext = createContext<CreditsContextType | undefined>(undefined)
 
 export function CreditsProvider({ children }: { children: ReactNode }) {
-  const { isSignedIn, user } = useUser()
+  const { user, isLoading: isAuthLoading } = useAuth()
   const [credits, setCredits] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const supabase = createClientComponentClient()
 
   // Carregar créditos do usuário do banco de dados
   const fetchCredits = async () => {
-    if (!isSignedIn) {
+    if (!user) {
       setCredits(0)
       setIsLoading(false)
       return
@@ -28,15 +30,15 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
 
     try {
       setIsLoading(true)
-      const response = await fetch("/api/credits")
 
-      if (response.ok) {
-        const data = await response.json()
-        setCredits(data.credits)
-      } else {
-        // Se houver erro, não atualizamos os créditos
-        console.error("Erro ao carregar créditos:", await response.text())
+      const { data, error } = await supabase.from("users").select("credits").eq("id", user.id).single()
+
+      if (error) {
+        console.error("Erro ao carregar créditos:", error)
+        return
       }
+
+      setCredits(data.credits)
     } catch (error) {
       console.error("Erro ao carregar créditos:", error)
     } finally {
@@ -46,32 +48,55 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
 
   // Carregar créditos quando o usuário fizer login
   useEffect(() => {
-    fetchCredits()
-  }, [isSignedIn, user?.id])
+    if (!isAuthLoading) {
+      fetchCredits()
+    }
+  }, [isAuthLoading, user?.id])
 
   // Adicionar créditos ao usuário
   const addCredits = async (amount: number, price: number) => {
-    if (!isSignedIn) return
+    if (!user) return
 
     try {
-      const response = await fetch("/api/credits", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          amount: price,
-          credits: amount,
-          provider: "manual",
-        }),
+      // Registrar a compra
+      const purchaseId = crypto.randomUUID()
+
+      await supabase.from("purchases").insert({
+        id: purchaseId,
+        amount: price,
+        credits: amount,
+        status: "completed",
+        provider: "manual",
+        user_id: user.id,
       })
 
-      if (response.ok) {
-        const data = await response.json()
-        setCredits(data.credits)
-      } else {
-        throw new Error("Falha ao adicionar créditos")
+      // Obter créditos atuais
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("credits")
+        .eq("id", user.id)
+        .single()
+
+      if (userError) {
+        throw userError
       }
+
+      // Atualizar créditos
+      const { data, error } = await supabase
+        .from("users")
+        .update({
+          credits: userData.credits + amount,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", user.id)
+        .select()
+        .single()
+
+      if (error) {
+        throw error
+      }
+
+      setCredits(data.credits)
     } catch (error) {
       console.error("Erro ao adicionar créditos:", error)
       throw error
@@ -80,7 +105,7 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
 
   // Decrementar créditos do usuário (versão simplificada)
   const decrementCredits = () => {
-    if (isSignedIn && credits > 0) {
+    if (user && credits > 0) {
       setCredits((prev) => Math.max(0, prev - 1))
     }
   }

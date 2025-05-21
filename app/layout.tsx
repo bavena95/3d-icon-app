@@ -4,7 +4,7 @@ import { Inter } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { CreditsProvider } from "@/hooks/use-credits"
-import { ClerkProvider } from "@clerk/nextjs"
+import { AuthProvider } from "@/contexts/auth-context"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,14 +24,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <ClerkProvider>
-      <html lang="en" suppressHydrationWarning className={inter.variable}>
-        <body className="font-sans antialiased">
-          <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <body className="font-sans antialiased">
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+          <AuthProvider>
             <CreditsProvider>{children}</CreditsProvider>
-          </ThemeProvider>
-        </body>
-      </html>
-    </ClerkProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </body>
+    </html>
   )
 }

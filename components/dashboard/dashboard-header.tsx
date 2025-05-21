@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { UserButton } from "@clerk/nextjs"
+import UserButton from "@/components/auth/user-button"
 import CreditBadge from "@/components/credit-badge"
 import { useCredits } from "@/hooks/use-credits"
 
@@ -29,7 +29,7 @@ export default function DashboardHeader() {
 
         <div className="flex items-center space-x-4">
           <CreditBadge credits={credits} />
-          <UserButton afterSignOutUrl="/" />
+          <UserButton />
         </div>
       </div>
     </header>

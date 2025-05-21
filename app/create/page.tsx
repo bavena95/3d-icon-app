@@ -1,14 +1,32 @@
-import { currentUser } from "@clerk/nextjs/server"
-import { redirect } from "next/navigation"
+"use client"
+
 import DashboardHeader from "@/components/dashboard/dashboard-header"
 import IconGenerator from "@/components/icon-generator"
+import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { Loader2 } from "lucide-react"
 
-export default async function CreatePage() {
-  // Verificação de autenticação na própria página
-  const user = await currentUser()
+export default function CreatePage() {
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/auth/login")
+    }
+  }, [isLoading, user, router])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-gray-400" />
+      </div>
+    )
+  }
 
   if (!user) {
-    return redirect("/sign-in")
+    return null // Será redirecionado pelo useEffect
   }
 
   return (

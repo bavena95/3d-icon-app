@@ -1,17 +1,35 @@
-import { currentUser } from "@clerk/nextjs/server"
-import { redirect } from "next/navigation"
+"use client"
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import DashboardHeader from "@/components/dashboard/dashboard-header"
 import UserCredits from "@/components/dashboard/user-credits"
 import UserIcons from "@/components/dashboard/user-icons"
+import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
+import { Loader2 } from "lucide-react"
 
-export default async function DashboardPage() {
-  // Verificação de autenticação na própria página
-  const user = await currentUser()
+export default function DashboardPage() {
+  const { user, isLoading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/auth/login")
+    }
+  }, [isLoading, user, router])
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-gray-400" />
+      </div>
+    )
+  }
 
   if (!user) {
-    return redirect("/sign-in")
+    return null // Será redirecionado pelo useEffect
   }
 
   return (
@@ -22,7 +40,7 @@ export default async function DashboardPage() {
         <div className="mb-8 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">User Dashboard</h1>
-            <p className="text-gray-600">Welcome, {user.firstName || "User"}</p>
+            <p className="text-gray-600">Welcome, {user.user_metadata?.name || "User"}</p>
           </div>
 
           <Button asChild className="bg-black text-white hover:bg-gray-800 rounded-full">

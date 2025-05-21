@@ -1,20 +1,14 @@
-import postgres from "postgres"
-
-// Configuração do cliente PostgreSQL
-const sql = postgres(process.env.NEON_DATABASE_URL!, {
-  ssl: true,
-  max: 10, // Limite de conexões para ambiente serverless
-})
-
-export default sql
+import { createRouteHandlerClient } from "./supabase"
+import { v4 as uuidv4 } from "uuid"
 
 // Tipos para nossas entidades
 export type User = {
   id: string
   email: string
+  name: string | null
   credits: number
-  createdAt: Date
-  updatedAt: Date
+  createdAt: string
+  updatedAt: string
 }
 
 export type Icon = {
@@ -22,7 +16,7 @@ export type Icon = {
   prompt: string
   staticUrl: string
   animatedUrl: string | null
-  createdAt: Date
+  createdAt: string
   userId: string
 }
 
@@ -32,75 +26,196 @@ export type Purchase = {
   credits: number
   status: string
   provider: string
-  createdAt: Date
+  createdAt: string
   userId: string
 }
 
 // Funções para usuários
 export async function getUserById(userId: string): Promise<User | null> {
-  const users = await sql<User[]>`
-    SELECT * FROM users WHERE id = ${userId} LIMIT 1
-  `
-  return users.length > 0 ? users[0] : null
+  const supabase = createRouteHandlerClient()
+
+  const { data, error } = await supabase.from("users").select("*").eq("id", userId).single()
+
+  if (error || !data) {
+    console.error("Error fetching user:", error)
+    return null
+  }
+
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    credits: data.credits,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  }
 }
 
-export async function createUser(userId: string, email: string, initialCredits = 3): Promise<User> {
-  const users = await sql<User[]>`
-    INSERT INTO users (id, email, credits, created_at, updated_at)
-    VALUES (${userId}, ${email}, ${initialCredits}, NOW(), NOW())
-    RETURNING *
-  `
-  return users[0]
+export async function createUser(
+  userId: string,
+  email: string,
+  name: string | null = null,
+  initialCredits = 3,
+): Promise<User> {
+  const supabase = createRouteHandlerClient()
+
+  const { data, error } = await supabase
+    .from("users")
+    .insert({
+      id: userId,
+      email,
+      name,
+      credits: initialCredits,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error creating user:", error)
+    throw new Error("Failed to create user")
+  }
+
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    credits: data.credits,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  }
 }
 
 export async function updateUserEmail(userId: string, email: string): Promise<User> {
-  const users = await sql<User[]>`
-    UPDATE users
-    SET email = ${email}, updated_at = NOW()
-    WHERE id = ${userId}
-    RETURNING *
-  `
-  return users[0]
+  const supabase = createRouteHandlerClient()
+
+  const { data, error } = await supabase
+    .from("users")
+    .update({
+      email,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error updating user email:", error)
+    throw new Error("Failed to update user email")
+  }
+
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    credits: data.credits,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  }
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  await sql`
-    DELETE FROM users WHERE id = ${userId}
-  `
+  const supabase = createRouteHandlerClient()
+
+  const { error } = await supabase.from("users").delete().eq("id", userId)
+
+  if (error) {
+    console.error("Error deleting user:", error)
+    throw new Error("Failed to delete user")
+  }
 }
 
 export async function getUserCredits(userId: string): Promise<number> {
-  const result = await sql<{ credits: number }[]>`
-    SELECT credits FROM users WHERE id = ${userId} LIMIT 1
-  `
-  return result.length > 0 ? result[0].credits : 0
+  const supabase = createRouteHandlerClient()
+
+  const { data, error } = await supabase.from("users").select("credits").eq("id", userId).single()
+
+  if (error) {
+    console.error("Error fetching user credits:", error)
+    return 0
+  }
+
+  return data.credits
 }
 
 export async function addCreditsToUser(userId: string, amount: number): Promise<User> {
-  const users = await sql<User[]>`
-    UPDATE users
-    SET credits = credits + ${amount}, updated_at = NOW()
-    WHERE id = ${userId}
-    RETURNING *
-  `
-  return users[0]
+  const supabase = createRouteHandlerClient()
+
+  // Primeiro, obtemos os créditos atuais
+  const { data: userData, error: userError } = await supabase.from("users").select("credits").eq("id", userId).single()
+
+  if (userError) {
+    console.error("Error fetching user credits:", userError)
+    throw new Error("Failed to fetch user credits")
+  }
+
+  // Atualizamos os créditos
+  const { data, error } = await supabase
+    .from("users")
+    .update({
+      credits: userData.credits + amount,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error adding credits to user:", error)
+    throw new Error("Failed to add credits to user")
+  }
+
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    credits: data.credits,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  }
 }
 
 export async function decrementUserCredits(userId: string): Promise<User> {
-  // Primeiro verificamos se o usuário tem créditos suficientes
-  const currentCredits = await getUserCredits(userId)
+  const supabase = createRouteHandlerClient()
 
-  if (currentCredits <= 0) {
-    throw new Error("Créditos insuficientes")
+  // Primeiro, obtemos os créditos atuais
+  const { data: userData, error: userError } = await supabase.from("users").select("credits").eq("id", userId).single()
+
+  if (userError) {
+    console.error("Error fetching user credits:", userError)
+    throw new Error("Failed to fetch user credits")
   }
 
-  const users = await sql<User[]>`
-    UPDATE users
-    SET credits = credits - 1, updated_at = NOW()
-    WHERE id = ${userId}
-    RETURNING *
-  `
-  return users[0]
+  // Verificamos se o usuário tem créditos suficientes
+  if (userData.credits <= 0) {
+    throw new Error("Insufficient credits")
+  }
+
+  // Decrementamos os créditos
+  const { data, error } = await supabase
+    .from("users")
+    .update({
+      credits: userData.credits - 1,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", userId)
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error decrementing user credits:", error)
+    throw new Error("Failed to decrement user credits")
+  }
+
+  return {
+    id: data.id,
+    email: data.email,
+    name: data.name,
+    credits: data.credits,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+  }
 }
 
 // Funções para ícones
@@ -110,21 +225,61 @@ export async function saveIcon(
   staticUrl: string,
   animatedUrl: string | null,
 ): Promise<Icon> {
-  const icons = await sql<Icon[]>`
-    INSERT INTO icons (id, prompt, static_url, animated_url, created_at, user_id)
-    VALUES (${crypto.randomUUID()}, ${prompt}, ${staticUrl}, ${animatedUrl}, NOW(), ${userId})
-    RETURNING *
-  `
-  return icons[0]
+  const supabase = createRouteHandlerClient()
+
+  const iconId = uuidv4()
+
+  const { data, error } = await supabase
+    .from("icons")
+    .insert({
+      id: iconId,
+      prompt,
+      static_url: staticUrl,
+      animated_url: animatedUrl,
+      created_at: new Date().toISOString(),
+      user_id: userId,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error saving icon:", error)
+    throw new Error("Failed to save icon")
+  }
+
+  return {
+    id: data.id,
+    prompt: data.prompt,
+    staticUrl: data.static_url,
+    animatedUrl: data.animated_url,
+    createdAt: data.created_at,
+    userId: data.user_id,
+  }
 }
 
 export async function getUserIcons(userId: string, limit = 20): Promise<Icon[]> {
-  return sql<Icon[]>`
-    SELECT * FROM icons
-    WHERE user_id = ${userId}
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `
+  const supabase = createRouteHandlerClient()
+
+  const { data, error } = await supabase
+    .from("icons")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error("Error fetching user icons:", error)
+    return []
+  }
+
+  return data.map((icon) => ({
+    id: icon.id,
+    prompt: icon.prompt,
+    staticUrl: icon.static_url,
+    animatedUrl: icon.animated_url,
+    createdAt: icon.created_at,
+    userId: icon.user_id,
+  }))
 }
 
 // Funções para compras
@@ -134,60 +289,68 @@ export async function recordPurchase(
   credits: number,
   provider = "manual",
 ): Promise<Purchase> {
-  const purchases = await sql<Purchase[]>`
-    INSERT INTO purchases (id, amount, credits, status, provider, created_at, user_id)
-    VALUES (${crypto.randomUUID()}, ${amount}, ${credits}, 'completed', ${provider}, NOW(), ${userId})
-    RETURNING *
-  `
-  return purchases[0]
+  const supabase = createRouteHandlerClient()
+
+  const purchaseId = uuidv4()
+
+  const { data, error } = await supabase
+    .from("purchases")
+    .insert({
+      id: purchaseId,
+      amount,
+      credits,
+      status: "completed",
+      provider,
+      created_at: new Date().toISOString(),
+      user_id: userId,
+    })
+    .select()
+    .single()
+
+  if (error) {
+    console.error("Error recording purchase:", error)
+    throw new Error("Failed to record purchase")
+  }
+
+  return {
+    id: data.id,
+    amount: data.amount,
+    credits: data.credits,
+    status: data.status,
+    provider: data.provider,
+    createdAt: data.created_at,
+    userId: data.user_id,
+  }
 }
 
 export async function getUserPurchases(userId: string, limit = 10): Promise<Purchase[]> {
-  return sql<Purchase[]>`
-    SELECT * FROM purchases
-    WHERE user_id = ${userId}
-    ORDER BY created_at DESC
-    LIMIT ${limit}
-  `
+  const supabase = createRouteHandlerClient()
+
+  const { data, error } = await supabase
+    .from("purchases")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error("Error fetching user purchases:", error)
+    return []
+  }
+
+  return data.map((purchase) => ({
+    id: purchase.id,
+    amount: purchase.amount,
+    credits: purchase.credits,
+    status: purchase.status,
+    provider: purchase.provider,
+    createdAt: purchase.created_at,
+    userId: purchase.user_id,
+  }))
 }
 
 // Função para inicializar o banco de dados (criar tabelas se não existirem)
+// Esta função não é necessária com o Supabase, pois as tabelas são criadas no console do Supabase
 export async function initDatabase() {
-  // Criar tabela de usuários
-  await sql`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT UNIQUE,
-      credits INTEGER NOT NULL DEFAULT 0,
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-      updated_at TIMESTAMP WITH TIME ZONE NOT NULL
-    )
-  `
-
-  // Criar tabela de ícones
-  await sql`
-    CREATE TABLE IF NOT EXISTS icons (
-      id TEXT PRIMARY KEY,
-      prompt TEXT NOT NULL,
-      static_url TEXT NOT NULL,
-      animated_url TEXT,
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE
-    )
-  `
-
-  // Criar tabela de compras
-  await sql`
-    CREATE TABLE IF NOT EXISTS purchases (
-      id TEXT PRIMARY KEY,
-      amount INTEGER NOT NULL,
-      credits INTEGER NOT NULL,
-      status TEXT NOT NULL DEFAULT 'completed',
-      provider TEXT NOT NULL DEFAULT 'manual',
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-      user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE
-    )
-  `
-
-  console.log("Database initialized successfully")
+  console.log("Database initialization is handled through the Supabase dashboard")
 }

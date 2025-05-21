@@ -1,17 +1,24 @@
 import { NextResponse } from "next/server"
-import { currentUser } from "@clerk/nextjs/server"
+import { createRouteHandlerClient } from "@/lib/supabase"
 import { getUserCredits, addCreditsToUser, recordPurchase } from "@/lib/db"
 
 export async function GET() {
   try {
-    const user = await currentUser()
+    const supabase = createRouteHandlerClient()
 
-    if (!user) {
+    // Verificar autenticação
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
 
+    const userId = session.user.id
+
     // Obter créditos do usuário
-    const credits = await getUserCredits(user.id)
+    const credits = await getUserCredits(userId)
 
     return NextResponse.json({
       success: true,
@@ -25,11 +32,18 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const user = await currentUser()
+    const supabase = createRouteHandlerClient()
 
-    if (!user) {
+    // Verificar autenticação
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     const { amount, credits, provider = "manual" } = await request.json()
 
@@ -38,10 +52,10 @@ export async function POST(request: Request) {
     }
 
     // Registrar a compra
-    await recordPurchase(user.id, amount, credits, provider)
+    await recordPurchase(userId, amount, credits, provider)
 
     // Adicionar créditos ao usuário
-    const updatedUser = await addCreditsToUser(user.id, credits)
+    const updatedUser = await addCreditsToUser(userId, credits)
 
     return NextResponse.json({
       success: true,

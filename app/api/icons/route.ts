@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { currentUser } from "@clerk/nextjs/server"
+import { createRouteHandlerClient } from "@/lib/supabase"
 import { decrementUserCredits, saveIcon, getUserIcons } from "@/lib/db"
 import { uploadToR2 } from "@/lib/r2"
 import openai from "@/lib/openai"
@@ -8,11 +8,18 @@ import { checkCache, addToCache } from "@/lib/cache"
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await currentUser()
+    const supabase = createRouteHandlerClient()
 
-    if (!user) {
+    // Verificar autenticação
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     const formData = await req.formData()
     const prompt = formData.get("prompt") as string
@@ -30,7 +37,7 @@ export async function POST(req: NextRequest) {
         console.log(`Cache hit para prompt: ${prompt}`)
 
         // Salvar o ícone para o usuário (sem decrementar créditos)
-        const icon = await saveIcon(user.id, prompt, cachedItem.staticUrl, cachedItem.animatedUrl)
+        const icon = await saveIcon(userId, prompt, cachedItem.staticUrl, cachedItem.animatedUrl)
 
         return NextResponse.json({
           success: true,
@@ -52,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     // Verificar e decrementar créditos
     try {
-      await decrementUserCredits(user.id)
+      await decrementUserCredits(userId)
     } catch (error) {
       return NextResponse.json({ error: "Créditos insuficientes" }, { status: 402 })
     }
@@ -79,19 +86,19 @@ export async function POST(req: NextRequest) {
     const imageBuffer = Buffer.from(imageBase64, "base64")
 
     // Fazer upload da imagem estática para o R2
-    const staticKey = `icons/${user.id}/${Date.now()}-static.png`
+    const staticKey = `icons/${userId}/${Date.now()}-static.png`
     const staticUrl = await uploadToR2(imageBuffer, staticKey, "image/png", {
       prompt,
-      userId: user.id,
+      userId,
       type: "static",
     })
 
     // Por enquanto, usamos a mesma imagem para a versão animada
     // Em uma implementação futura, isso seria substituído pela integração com RunwayML
-    const animatedKey = `icons/${user.id}/${Date.now()}-animated.png`
+    const animatedKey = `icons/${userId}/${Date.now()}-animated.png`
     const animatedUrl = await uploadToR2(imageBuffer, animatedKey, "image/png", {
       prompt,
-      userId: user.id,
+      userId,
       type: "animated",
     })
 
@@ -99,7 +106,7 @@ export async function POST(req: NextRequest) {
     await addToCache(prompt, staticUrl, animatedUrl)
 
     // Salvar o ícone no banco de dados
-    const icon = await saveIcon(user.id, prompt, staticUrl, animatedUrl)
+    const icon = await saveIcon(userId, prompt, staticUrl, animatedUrl)
 
     return NextResponse.json({
       success: true,
@@ -125,14 +132,21 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const user = await currentUser()
+    const supabase = createRouteHandlerClient()
 
-    if (!user) {
+    // Verificar autenticação
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
 
+    const userId = session.user.id
+
     // Obter os ícones do usuário do banco de dados
-    const icons = await getUserIcons(user.id)
+    const icons = await getUserIcons(userId)
 
     return NextResponse.json({
       success: true,
