@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 import { decrementUserCredits, saveIcon as dbSaveIcon } from "@/lib/db"
 import { uploadToR2 } from "@/lib/r2"
 import openai from "@/lib/openai"
@@ -8,11 +9,18 @@ import { checkCache, addToCache } from "@/lib/cache"
 
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = auth()
+    const supabase = createRouteHandlerClient({ cookies })
 
-    if (!userId) {
+    // Verificar autenticação
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     const formData = await req.formData()
     const prompt = formData.get("prompt") as string

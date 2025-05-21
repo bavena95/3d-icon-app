@@ -1,9 +1,7 @@
-import { initDatabase } from "../lib/db"
-
 async function main() {
   try {
-    await initDatabase()
-    console.log("Database initialized successfully")
+    console.log("Database initialization is now handled through the Supabase dashboard")
+    console.log("Please create the necessary tables using the Supabase SQL Editor")
     process.exit(0)
   } catch (error) {
     console.error("Failed to initialize database:", error)

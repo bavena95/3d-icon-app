@@ -353,4 +353,5 @@ export async function getUserPurchases(userId: string, limit = 10): Promise<Purc
 // Esta função não é necessária com o Supabase, pois as tabelas são criadas no console do Supabase
 export async function initDatabase() {
   console.log("Database initialization is handled through the Supabase dashboard")
+  console.log("Please create the necessary tables using the Supabase SQL Editor")
 }

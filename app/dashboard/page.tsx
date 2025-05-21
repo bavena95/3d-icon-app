@@ -50,11 +50,11 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1">
-            <UserCredits userId={user.id} />
+            <UserCredits />
           </div>
 
           <div className="md:col-span-2">
-            <UserIcons userId={user.id} />
+            <UserIcons />
           </div>
         </div>
       </main>

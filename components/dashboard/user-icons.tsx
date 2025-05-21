@@ -7,20 +7,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Download, ExternalLink, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { useAuth } from "@/contexts/auth-context"
+import type { Icon } from "@/types/icon" // Import Icon type
 
-interface UserIconsProps {
-  userId: string
-}
+export default function UserIcons() {
+  const { user } = useAuth()
+  const userId = user?.id
 
-interface Icon {
-  id: string
-  prompt: string
-  staticUrl: string
-  animatedUrl: string | null
-  createdAt: string
-}
-
-export default function UserIcons({ userId }: UserIconsProps) {
   const [icons, setIcons] = useState<Icon[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)

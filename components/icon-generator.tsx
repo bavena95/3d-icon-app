@@ -11,7 +11,7 @@ import Image from "next/image"
 import { useCredits } from "@/hooks/use-credits"
 import CreditBadge from "@/components/credit-badge"
 import PurchaseCreditsModal from "@/components/purchase-credits-modal"
-import { useUser } from "@clerk/nextjs"
+import { useAuth } from "@/hooks/use-auth"
 
 interface IconResult {
   id: string
@@ -31,7 +31,7 @@ export default function IconGenerator() {
   const [skipCache, setSkipCache] = useState(false)
   const { toast } = useToast()
   const { credits, decrementCredits, refreshCredits } = useCredits()
-  const { isSignedIn } = useUser()
+  const { user } = useAuth()
 
   // Update the function handleSubmit to handle API errors better
   const handleSubmit = async (e: React.FormEvent) => {
@@ -46,7 +46,7 @@ export default function IconGenerator() {
       return
     }
 
-    if (!isSignedIn) {
+    if (!user) {
       toast({
         title: "Authentication required",
         description: "You need to be logged in to generate icons",

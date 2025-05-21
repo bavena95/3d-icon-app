@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server"
-import { auth } from "@clerk/nextjs/server"
+import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
+import { cookies } from "next/headers"
 import { saveIcon as dbSaveIcon } from "@/lib/db"
 import { uploadToR2 } from "@/lib/r2"
 
 export async function POST(request: Request) {
   try {
-    const { userId } = auth()
+    const supabase = createRouteHandlerClient({ cookies })
 
-    if (!userId) {
+    // Verificar autenticação
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+
+    if (!session) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 })
     }
+
+    const userId = session.user.id
 
     // Parse request body
     const body = await request.json()

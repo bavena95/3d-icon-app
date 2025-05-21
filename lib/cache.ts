@@ -195,13 +195,17 @@ export async function getCacheStats(): Promise<{
     }
 
     // Obter soma total de acessos
-    const { data: hitsData, error: hitsError } = await supabase.rpc("sum_access_count")
+    // Substituir a chamada RPC que não existe no Supabase por uma abordagem alternativa
+    // Substituir:
+    // const { data: hitsData, error: hitsError } = await supabase.rpc("sum_access_count")
+    // Por:
+    const { data: accessData, error: accessError } = await supabase.from("icon_cache").select("access_count")
 
-    if (hitsError) {
-      console.error("Erro ao obter soma de acessos:", hitsError)
+    if (accessError) {
+      console.error("Erro ao obter contagem de acessos:", accessError)
     }
 
-    const totalHits = hitsData || 0
+    const totalHits = accessData ? accessData.reduce((sum, item) => sum + item.access_count, 0) : 0
 
     // Obter item mais antigo
     const { data: oldestData, error: oldestError } = await supabase

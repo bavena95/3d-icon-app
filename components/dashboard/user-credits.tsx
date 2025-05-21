@@ -6,12 +6,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Coins, Plus, RefreshCw } from "lucide-react"
 import { useCredits } from "@/hooks/use-credits"
 import PurchaseCreditsModal from "@/components/purchase-credits-modal"
+import { useAuth } from "@/contexts/auth-context"
 
-interface UserCreditsProps {
-  userId: string
-}
-
-export default function UserCredits({ userId }: UserCreditsProps) {
+export default function UserCredits() {
+  const { user } = useAuth()
+  const userId = user?.id
   const { credits, isLoading, refreshCredits } = useCredits()
   const [showPurchaseModal, setShowPurchaseModal] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
