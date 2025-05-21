@@ -33,6 +33,9 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         setCredits(data.credits)
+      } else {
+        // Se houver erro, não atualizamos os créditos
+        console.error("Erro ao carregar créditos:", await response.text())
       }
     } catch (error) {
       console.error("Erro ao carregar créditos:", error)
@@ -66,6 +69,8 @@ export function CreditsProvider({ children }: { children: ReactNode }) {
       if (response.ok) {
         const data = await response.json()
         setCredits(data.credits)
+      } else {
+        throw new Error("Falha ao adicionar créditos")
       }
     } catch (error) {
       console.error("Erro ao adicionar créditos:", error)

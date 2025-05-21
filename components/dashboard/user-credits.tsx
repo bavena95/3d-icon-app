@@ -15,11 +15,16 @@ export default function UserCredits({ userId }: UserCreditsProps) {
   const { credits, isLoading, refreshCredits } = useCredits()
   const [showPurchaseModal, setShowPurchaseModal] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [error, setError] = useState(false)
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
+    setError(false)
     try {
       await refreshCredits()
+    } catch (e) {
+      console.error("Erro ao atualizar créditos:", e)
+      setError(true)
     } finally {
       setIsRefreshing(false)
     }
@@ -48,11 +53,13 @@ export default function UserCredits({ userId }: UserCreditsProps) {
               <div className="text-3xl font-bold">
                 {isLoading ? (
                   <span className="inline-block h-8 w-16 bg-gray-200 animate-pulse rounded"></span>
+                ) : error ? (
+                  <span className="text-gray-400">--</span>
                 ) : (
                   credits
                 )}
               </div>
-              <div className="text-sm text-gray-500 mt-1">available credits</div>
+              <div className="text-sm text-gray-500 mt-1">{error ? "Unable to load credits" : "available credits"}</div>
             </div>
           </div>
         </CardContent>

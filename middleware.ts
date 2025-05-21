@@ -1,13 +1,9 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { clerkMiddleware } from "@clerk/nextjs/server"
 
-// Esta é uma versão mínima do middleware que não bloqueia nenhuma rota
-export function middleware(request: NextRequest) {
-  // Simplesmente permite todas as requisições
-  return NextResponse.next()
-}
+// Usar o middleware do Clerk corretamente
+export default clerkMiddleware()
 
 // Configuração mínima do matcher
 export const config = {
-  matcher: [],
+  matcher: ["/((?!.*\\..*|_next).*)", "/", "/(api|trpc)(.*)"],
 }
